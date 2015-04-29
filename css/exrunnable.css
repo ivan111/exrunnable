@@ -1,0 +1,49 @@
+.code-container {
+    background: #FFF;
+    overflow: auto;
+    width: auto;
+    border: solid gray;
+    border-width: .1em .1em .1em .8em;
+    padding: .2em .6em;
+}
+
+
+.code-container pre {
+    margin: 0;
+    line-height: 125%;
+}
+
+
+.exr-panel {
+    margin: 1em auto 1em;
+}
+
+
+.exr-panel input[type=button] {
+    margin-right: 1em;
+    padding: 4px;
+}
+
+
+textarea.exr-console {
+    color: #FFF;
+    background-color: #333;
+}
+
+
+table.exr-table {
+    border-collapse: collapse;
+}
+
+
+table.exr-table th {
+    color: #FFF;
+    background-color: #333;
+}
+
+
+table.exr-table th,
+table.exr-table td {
+    border: 1px solid #000;
+    padding: 2px;
+}

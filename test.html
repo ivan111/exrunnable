@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<title>exrunnable</title>
+
+<link rel="stylesheet" href="css/exrunnable.css" type="text/css"/>
+
+<script src="js/exrunnable.js"></script>
+<script src="js/code.js"></script>
+
+<script type="text/javascript">
+window.onload = function () {
+  var code = new exr.Code()
+    .foreach("n", [0, 1, 2, 3])
+      .aIf(function (e) { return e.vars.n === 0; })
+        .print("0")
+      .elif(function (e) { return e.vars.n === 1; })
+        .print("1")
+      .elif(function (e) { return e.vars.n === 2; })
+        .print("2")
+      .aElse()
+        .print("3")
+      .endIf(true)
+    .endForeach()
+    .print("4");
+
+  var env = {
+    container: document.getElementById("container1"),
+    example: document.getElementById("example1"),
+    maxVarsNum: 1,
+    showRunButton: true,
+    code: code
+  };
+
+  exr.create(env);
+
+
+  code = new exr.Code()
+    .assign("i", 0)
+    .aWhile(function (e) { return e.vars.i !== 3; })
+      .print(function (e) { return e.vars.i; })
+      .add("i", 1)
+    .endWhile();
+
+  env = {
+    container: document.getElementById("container2"),
+    example: document.getElementById("example2"),
+    maxVarsNum: 1,
+    showRunButton: true,
+    code: code
+  };
+
+  exr.create(env);
+
+
+  code = new exr.Code()
+    .aFor(5)
+      .print("hello\n")
+    .endFor();
+
+  env = {
+    container: document.getElementById("container3"),
+    example: document.getElementById("example3"),
+    maxVarsNum: 1,
+    showVarsTable: false,
+    showRunButton: true,
+    code: code
+  };
+
+  exr.create(env);
+};
+</script>
+
+</head>
+
+<body>
+
+<div id="container1">
+
+<div class="code-container"><pre id="example1">for n in [0, 1, 2, 3]:
+    if n == 0:
+        print("0")
+    elif n == 1:
+        print("1")
+    elif n == 2:
+        print("2")
+    else:
+        print("3")
+
+print("4")</pre></div>
+
+</div>
+
+
+
+<div id="container2">
+
+<div class="code-container"><pre id="example2">i = 0
+while i != 3:
+  print(i)
+  i += 1
+</pre></div>
+
+</div>
+
+
+
+<div id="container3">
+
+<div class="code-container"><pre id="example3">for 5:
+  print("hello\n")
+</pre></div>
+
+</div>
+
+
+
+</body>
+
+</html>

@@ -1,0 +1,13 @@
+{
+    "env": {
+        "browser": true
+    },
+
+    "globals": {
+        "exr": true
+    },
+
+    "rules": {
+        "no-use-before-define": [true, "nofunc"]
+    }
+}
