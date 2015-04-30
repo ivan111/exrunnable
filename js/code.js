@@ -67,25 +67,39 @@
     };
 
 
-    Code.prototype.print = function (f) {
+    Code.prototype.print = function (f, newline) {
         this.funcs.push(function (e) {
-            if (!e.showConsole) {
-                return;
-            }
-
             var s;
 
-            if (typeof f === "string") {
-                s = f;
-            } else {
+            if (typeof f === "function") {
                 s = f(e);
+            } else {
+                s = f;
             }
 
-            e.consoleText += s;
-            e.console.innerHTML = e.consoleText;
-
-            e.console.scrollTop = e.console.scrollHeight;
+            e.print(s, newline);
         });
+
+        return this;
+    };
+
+
+    Code.prototype.println = function (f) {
+        this.print(f, true);
+
+        return this;
+    };
+
+
+    Code.prototype.printVar = function (varName, newline) {
+        this.print(function (e) { return e.vars[varName]; }, newline);
+
+        return this;
+    };
+
+
+    Code.prototype.printVarln = function (varName) {
+        this.printVar(varName, true);
 
         return this;
     };
@@ -215,7 +229,11 @@
     Code.prototype.endForeach = function () {
         var foreach = this.foreachStack.pop();
 
-        this.funcs.push(function () { return foreach.i; });
+        var f = function () { return foreach.i; };
+
+        f.isEndLoop = true;
+
+        this.funcs.push(f);
 
         foreach.obj.endI = this.getCurIndex() + 1;
 

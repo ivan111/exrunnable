@@ -19,7 +19,7 @@
         showVarsTable: true,
         showRunButton: false,
         runClock: 10,
-        curLineColor: "#EEF"
+        curLineColor: "#DDF"
     };
 
 
@@ -32,6 +32,7 @@
         env.vars = {};
         env.varsList = [];
         env.assign = assign;
+        env.print = print;
 
         env.onCreateVarListeners = [];
         env.onChangeVarListeners = [];
@@ -72,6 +73,25 @@
     }
 
 
+    function print(s, newline) {
+        if (!this.showConsole) {
+            return;
+        }
+
+
+        s = formatVarVal(s, true);
+
+        if (newline) {
+            s += "\n";
+        }
+
+        this.consoleText += s;
+        this.console.innerHTML = this.consoleText;
+
+        this.console.scrollTop = this.console.scrollHeight;
+    }
+
+
     function onCreateVar(env, varName, val) {
         if (env.varsList.length <= env.maxVarsNum) {
             var tr = env.varsTable.getElementsByClassName("exr-vars-" + (env.varsList.length - 1))[0];
@@ -96,14 +116,41 @@
     }
 
 
-    function formatVarVal(val) {
+    function formatVarVal(val, isConsole) {
         if (typeof val === "string") {
-            val = ["\"", val, "\""].join("");
+            if (!isConsole) {
+                val = ["\"", val, "\""].join("");
+            }
+        } else if (Object.prototype.toString.call(val) === "[object Array]") {
+            val = ["[", val, "]"].join("");
+        } else if (typeof val === "object") {
+            var arr = ["{"];
+            var first = true;
+
+            for (var key in val) {
+                if (first) {
+                    first = false;
+                } else {
+                    arr.push(", ");
+                }
+
+                arr.push(key);
+                arr.push(": ");
+                arr.push(val[key]);
+            }
+
+            arr.push("}");
+
+            val = arr.join("");
         } else {
             val = "" + val;
         }
 
-        return val.replace("\n", "\\n");
+        if (!isConsole) {
+            val = val.replace("\n", "\\n");
+        }
+
+        return val;
     }
 
 
@@ -148,7 +195,7 @@
     function createVarsTable(env) {
         var arr = [];
 
-        arr.push("<tr><th>変数名</th><th>値</th></tr>");
+        arr.push("<tr><th>Name</th><th>Value</th></tr>");
 
         for (var i = 0; i < env.maxVarsNum; i++) {
             arr.push("<tr class='exr-vars-");
@@ -232,9 +279,9 @@
     function createControlPanel(env) {
         var div = document.createElement("div");
         div.className = "exr-panel";
-        div.innerHTML = "<input class='step-button' type='button' value='ステップ実行' />" +
-                        (env.showRunButton ? "<input class='run-button' type='button' value='実行' />" : "") +
-                        "<input class='reset-button' type='button' value='リセット' />";
+        div.innerHTML = "<input class='step-button' type='button' value='step' />" +
+                        (env.showRunButton ? "<input class='run-button' type='button' value='run' />" : "") +
+                        "<input class='reset-button' type='button' value='reset' />";
 
         env.container.appendChild(div);
         env.container.insertBefore(div, env.container.firstChild);
@@ -254,11 +301,20 @@
             }
 
             if (typeof nextLine !== "undefined") {
+                f = funcs[nextLine];
+                if (f && f.isEndLoop) {
+                    nextLine = f(env);
+                }
+
                 env.setCurrentLine(nextLine);
             } else {
                 do {
                     f = funcs[++i];
                 } while (f === exr.SKIP);
+
+                if (f && f.isEndLoop) {
+                    i = f(env);
+                }
 
                 env.setCurrentLine(i);
 
@@ -276,18 +332,18 @@
                 if (env.isRunning) {
                     env.isRunning = false;
                     clearInterval(env.runTimerId);
-                    this.value = "実行";
+                    this.value = "run";
                 } else {
                     env.isRunning = true;
                     env.runTimerId = setInterval(stepRun, 1000 / env.runClock);
-                    this.value = "停止";
+                    this.value = "pause";
                 }
             };
 
             env.onCompleteListeners.push(function () {
                 env.isRunning = false;
                 clearInterval(env.runTimerId);
-                runBtn.value = "実行";
+                runBtn.value = "run";
             });
         }
 
