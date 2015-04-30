@@ -164,7 +164,11 @@
     Code.prototype.endFor = function () {
         var aFor = this.forStack.pop();
 
-        this.funcs.push(function () { return aFor.i; });
+        var f = function () { return aFor.i; };
+
+        f.isEndLoop = true;
+
+        this.funcs.push(f);
 
         aFor.obj.endI = this.getCurIndex() + 1;
 
@@ -191,7 +195,11 @@
     Code.prototype.endWhile = function () {
         var aWhile = this.whileStack.pop();
 
-        this.funcs.push(function () { return aWhile.i; });
+        var f = function () { return aWhile.i; };
+
+        f.isEndLoop = true;
+
+        this.funcs.push(f);
 
         aWhile.obj.endI = this.getCurIndex() + 1;
 
