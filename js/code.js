@@ -37,6 +37,27 @@
     }
 
 
+    Code.prototype.check = function () {
+        if (this.forStack.length !== 0) {
+            return "forStack.length = " + this.forStack.length;
+        }
+
+        if (this.whileStack.length !== 0) {
+            return "whileStack.length = " + this.whileStack.length;
+        }
+
+        if (this.foreachStack.length !== 0) {
+            return "foreachStack.length = " + this.foreachStack.length;
+        }
+
+        if (this.ifStack.length !== 0) {
+            return "ifStack.length = " + this.ifStack.length;
+        }
+
+        return "";
+    };
+
+
     Code.prototype.reset = function () {
         this.funcs.forEach(function (f) {
             if (f.reset) {
@@ -142,6 +163,7 @@
 
         function aFor() {
             if (i >= times) {
+                i = 0;
                 return obj.endI;
             }
 
@@ -171,6 +193,15 @@
         this.funcs.push(f);
 
         aFor.obj.endI = this.getCurIndex() + 1;
+
+        return this;
+    };
+
+
+    Code.prototype.breakFor = function () {
+        var aFor = this.forStack[this.forStack.length - 1];
+
+        this.funcs.push(function () { aFor.reset(); return aFor.obj.endI; });
 
         return this;
     };
@@ -207,12 +238,30 @@
     };
 
 
+    Code.prototype.breakWhile = function () {
+        var aWhile = this.whileStack[this.whileStack.length - 1];
+
+        this.funcs.push(function () { return aWhile.obj.endI; });
+
+        return this;
+    };
+
+
     Code.prototype.foreach = function (varName, arr) {
         var i = 0;
         var obj = {};
+        var bkArr = arr;
 
         function foreach(e) {
+            if (typeof arr === "function") {
+                bkArr = arr;
+                arr = arr(e);
+            }
+
             if (i >= arr.length) {
+                i = 0;
+                arr = bkArr;
+
                 return obj.endI;
             }
 
@@ -223,12 +272,13 @@
 
         foreach.reset = function () {
             i = 0;
+            arr = bkArr;
         };
 
         this.funcs.push(foreach);
 
         var foreachI = this.getCurIndex();
-        this.foreachStack.push({ i: foreachI, obj: obj });
+        this.foreachStack.push({ i: foreachI, obj: obj, reset: foreach.reset });
 
         return this;
     };
@@ -244,6 +294,15 @@
         this.funcs.push(f);
 
         foreach.obj.endI = this.getCurIndex() + 1;
+
+        return this;
+    };
+
+
+    Code.prototype.breakForeach = function () {
+        var foreach = this.foreachStack[this.foreachStack.length - 1];
+
+        this.funcs.push(function () { foreach.reset(); return foreach.obj.endI; });
 
         return this;
     };

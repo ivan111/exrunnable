@@ -31,12 +31,17 @@
         env.consoleText = "";
         env.vars = {};
         env.varsList = [];
+        env.step = step;
+        env.run = run;
+        env.pause = pause;
+        env.reset = reset;
         env.assign = assign;
         env.print = print;
 
         env.onCreateVarListeners = [];
         env.onChangeVarListeners = [];
         env.onCompleteListeners = [];
+        env.addChangeVarListener = addChangeVarListener;
         env.notifyCreateVar = notifyCreateVar;
         env.notifyChangeVar = notifyChangeVar;
         env.notifyComplete = notifyComplete;
@@ -61,11 +66,96 @@
     }
 
 
+    function step() {
+        var nextLine;
+        var funcs = this.code.funcs;
+        var i = this.curLine;
+
+        if (i < funcs.length) {
+            var f = funcs[i];
+
+            if (f) {
+                nextLine = f(this);
+            }
+        }
+
+        if (typeof nextLine !== "undefined") {
+            f = funcs[nextLine];
+            if (f && f.isEndLoop) {
+                nextLine = f(this);
+            }
+
+            this.setCurrentLine(nextLine);
+        } else {
+            do {
+                f = funcs[++i];
+            } while (f === exr.SKIP);
+
+            if (f && f.isEndLoop) {
+                i = f(this);
+            }
+
+            this.setCurrentLine(i);
+
+            if (this.isRunning && this.curLine >= this.code.funcs.length) {
+                this.notifyComplete();
+            }
+        }
+    }
+
+
+    function run() {
+        if (!this.isRunning) {
+            var env = this;
+
+            this.isRunning = true;
+            this.runTimerId = setInterval(function () {
+                env.step();
+            }, 1000 / this.runClock);
+
+            if (this.runBtn) {
+                this.runBtn.value = "pause";
+            }
+        }
+    }
+
+
+    function pause() {
+        if (this.isRunning) {
+            this.isRunning = false;
+            clearInterval(this.runTimerId);
+
+            if (this.runBtn) {
+                this.runBtn.value = "run";
+            }
+        }
+    }
+
+
+    function reset() {
+        this.code.reset();
+
+        if (this.showConsole) {
+            this.console.innerHTML = "";
+            this.consoleText = "";
+        }
+
+        this.setCurrentLine(this.startLine);
+
+        this.vars = {};
+        this.varsList = [];
+        clearVarsTable(this);
+
+        this.setup();
+    }
+
+
     function assign(varName, val) {
         if (!(varName in this.vars)) {
             this.varsList.push(varName);
             this.vars[varName] = val;
             this.notifyCreateVar(varName, val);
+            this.notifyChangeVar(varName, val);
         } else {
             this.vars[varName] = val;
             this.notifyChangeVar(varName, val);
@@ -136,7 +226,7 @@
 
                 arr.push(key);
                 arr.push(": ");
-                arr.push(val[key]);
+                arr.push(formatVarVal(val[key], isConsole));
             }
 
             arr.push("}");
@@ -162,6 +252,11 @@
         }
 
         return -1;
+    }
+
+
+    function addChangeVarListener(listener) {
+        this.onChangeVarListeners.push(listener);
     }
 
 
@@ -287,83 +382,23 @@
         env.container.insertBefore(div, env.container.firstChild);
 
         var stepBtn = div.getElementsByClassName("step-button")[0];
-        var stepRun = function () {
-            var nextLine;
-            var funcs = env.code.funcs;
-            var i = env.curLine;
-
-            if (i < funcs.length) {
-                var f = funcs[i];
-
-                if (f) {
-                    nextLine = f(env);
-                }
-            }
-
-            if (typeof nextLine !== "undefined") {
-                f = funcs[nextLine];
-                if (f && f.isEndLoop) {
-                    nextLine = f(env);
-                }
-
-                env.setCurrentLine(nextLine);
-            } else {
-                do {
-                    f = funcs[++i];
-                } while (f === exr.SKIP);
-
-                if (f && f.isEndLoop) {
-                    i = f(env);
-                }
-
-                env.setCurrentLine(i);
-
-                if (env.isRunning && env.curLine >= env.code.funcs.length) {
-                    env.notifyComplete();
-                }
-            }
-        };
-
-        stepBtn.onclick = stepRun;
+        stepBtn.onclick = function () { env.step(); };
 
         if (env.showRunButton) {
-            var runBtn = div.getElementsByClassName("run-button")[0];
-            runBtn.onclick = function () {
+            env.runBtn = div.getElementsByClassName("run-button")[0];
+            env.runBtn.onclick = function () {
                 if (env.isRunning) {
-                    env.isRunning = false;
-                    clearInterval(env.runTimerId);
-                    this.value = "run";
+                    env.pause();
                 } else {
-                    env.isRunning = true;
-                    env.runTimerId = setInterval(stepRun, 1000 / env.runClock);
-                    this.value = "pause";
+                    env.run();
                 }
             };
 
-            env.onCompleteListeners.push(function () {
-                env.isRunning = false;
-                clearInterval(env.runTimerId);
-                runBtn.value = "run";
-            });
+            env.onCompleteListeners.push(function () { env.pause(); });
         }
 
         var resetBtn = div.getElementsByClassName("reset-button")[0];
-        resetBtn.onclick = function () {
-            env.code.reset();
-
-            if (env.showConsole) {
-                env.console.innerHTML = "";
-                env.consoleText = "";
-            }
-
-            env.setCurrentLine(env.startLine);
-
-            env.vars = {};
-            env.varsList = [];
-            clearVarsTable(env);
-
-            env.setup();
-        };
+        resetBtn.onclick = function () { env.reset(); };
     }
 
 

@@ -70,6 +70,34 @@ window.onload = function () {
   };
 
   exr.create(env);
+
+
+
+  var code = new exr.Code()
+    .foreach("n", [0, 1, 2, 3])
+      .aIf(function (e) { return e.vars.n === 0; })
+        .print("0")
+      .elif(function (e) { return e.vars.n === 1; })
+        .breakForeach()
+      .elif(function (e) { return e.vars.n === 2; })
+        .print("2")
+      .aElse()
+        .print("3")
+      .endIf(true)
+    .endForeach()
+    .print("4");
+
+  var env = {
+    container: document.getElementById("container4"),
+    example: document.getElementById("example4"),
+    maxVarsNum: 1,
+    showRunButton: true,
+    code: code
+  };
+
+  exr.create(env);
+
+
 };
 </script>
 
@@ -115,6 +143,23 @@ while i != 3:
 
 </div>
 
+
+
+<div id="container4">
+
+<div class="code-container"><pre id="example4">for n in [0, 1, 2, 3]:
+    if n == 0:
+        print("0")
+    elif n == 1:
+        break
+    elif n == 2:
+        print("2")
+    else:
+        print("3")
+
+print("4")</pre></div>
+
+</div>
 
 
 </body>
