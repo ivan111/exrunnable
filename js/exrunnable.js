@@ -12,6 +12,7 @@
         startLine: 0,
         setup: function () {},
         code: null,
+        frames: [],
         maxVarsNum: 5,
         showConsole: true,
         consoleCols: 80,
@@ -35,6 +36,8 @@
         env.run = run;
         env.pause = pause;
         env.reset = reset;
+        env.aCall = aCall;
+        env.aReturn = aReturn;
         env.assign = assign;
         env.print = print;
 
@@ -67,39 +70,50 @@
 
 
     function step() {
-        var nextLine;
-        var funcs = this.code.funcs;
-        var i = this.curLine;
+        var nextLine = this.curLine + 1;
 
-        if (i < funcs.length) {
-            var f = funcs[i];
+        var before = this.code.beforeFuncs[this.curLine];
+        var f = this.code.funcs[this.curLine];
+        var after = this.code.afterFuncs[this.curLine];
+        var iUndef;
 
-            if (f) {
-                nextLine = f(this);
+        while (f) {
+            if (before) {
+                before(this);
+            }
+
+            var i = f(this);
+
+            if (after) {
+                after(this);
+            }
+
+            if (typeof i !== "undefined") {
+                iUndef = false;
+                nextLine = i;
+            } else {
+                iUndef = true;
+                i = nextLine;
+                nextLine++;
+            }
+
+            before = this.code.beforeFuncs[i];
+            f = this.code.funcs[i];
+            after = this.code.afterFuncs[i];
+
+            if (!(f && f.isSkip)) {
+                if (iUndef) {
+                    nextLine--;
+                }
+
+                break;
             }
         }
 
-        if (typeof nextLine !== "undefined") {
-            f = funcs[nextLine];
-            if (f && f.isEndLoop) {
-                nextLine = f(this);
-            }
+        this.setCurrentLine(nextLine);
 
-            this.setCurrentLine(nextLine);
-        } else {
-            do {
-                f = funcs[++i];
-            } while (f === exr.SKIP);
-
-            if (f && f.isEndLoop) {
-                i = f(this);
-            }
-
-            this.setCurrentLine(i);
-
-            if (this.isRunning && this.curLine >= this.code.funcs.length) {
-                this.notifyComplete();
-            }
+        if (this.isRunning && this.curLine >= this.code.funcs.length) {
+            this.notifyComplete();
         }
     }
 
@@ -147,6 +161,33 @@
         clearVarsTable(this);
 
         this.setup();
+    }
+
+
+    function aCall() {
+        this.frames.push({
+            retLineNo: this.curLine + 1,
+            vars: this.vars,
+            varsList: this.varsList
+        });
+
+        this.vars = {};
+        this.varsList = [];
+
+        clearVarsTable(this, true);
+    }
+
+
+    function aReturn(ret) {
+        var frame = this.frames.pop();
+
+        this.ret = ret;
+        this.vars = frame.vars;
+        this.varsList = frame.varsList;
+
+        clearVarsTable(this, true);
+
+        return frame.retLineNo;
     }
 
 
@@ -311,7 +352,7 @@
     }
 
 
-    function clearVarsTable(env) {
+    function clearVarsTable(env, isUpdate) {
         if (!env.showVarsTable) {
             return;
         }
@@ -319,8 +360,16 @@
         for (var i = 0; i < env.maxVarsNum; i++) {
             var tr = env.varsTable.getElementsByClassName("exr-vars-" + i)[0];
 
-            tr.childNodes[0].innerHTML = "　";
-            tr.childNodes[1].innerHTML = "　";
+            if (isUpdate && i < env.varsList.length) {
+                var name = env.varsList[i];
+                var val = formatVarVal(env.vars[name]);
+
+                tr.childNodes[0].innerHTML = name;
+                tr.childNodes[1].innerHTML = val;
+            } else {
+                tr.childNodes[0].innerHTML = "　";
+                tr.childNodes[1].innerHTML = "　";
+            }
         }
     }
 

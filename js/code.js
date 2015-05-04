@@ -2,11 +2,12 @@
     "use strict";
 
     exr.Code = Code;
-    exr.SKIP = SKIP;
 
 
     function Code() {
         this.funcs = [];
+        this.beforeFuncs = [];
+        this.afterFuncs = [];
         this.forStack = [];
         this.whileStack = [];
         this.foreachStack = [];
@@ -16,6 +17,8 @@
 
     function SKIP() {
     }
+
+    SKIP.isSkip = true;
 
 
     function NOP() {
@@ -39,22 +42,20 @@
 
     Code.prototype.check = function () {
         if (this.forStack.length !== 0) {
-            return "forStack.length = " + this.forStack.length;
+            throw "forStack.length = " + this.forStack.length;
         }
 
         if (this.whileStack.length !== 0) {
-            return "whileStack.length = " + this.whileStack.length;
+            throw "whileStack.length = " + this.whileStack.length;
         }
 
         if (this.foreachStack.length !== 0) {
-            return "foreachStack.length = " + this.foreachStack.length;
+            throw "foreachStack.length = " + this.foreachStack.length;
         }
 
         if (this.ifStack.length !== 0) {
-            return "ifStack.length = " + this.ifStack.length;
+            throw "ifStack.length = " + this.ifStack.length;
         }
-
-        return "";
     };
 
 
@@ -69,6 +70,28 @@
 
     Code.prototype.getCurIndex = function () {
         return this.funcs.length - 1;
+    };
+
+
+    Code.prototype.before = function (f) {
+        var i = this.funcs.length;
+
+        this.beforeFuncs[i] = f;
+
+        return this;
+    };
+
+
+    Code.prototype.after = function (f) {
+        var i = this.funcs.length - 1;
+
+        if (i === -1) {
+            throw "after -1";
+        }
+
+        this.afterFuncs[i] = f;
+
+        return this;
     };
 
 
@@ -157,6 +180,66 @@
     Code.prototype.div = op2(function (x, y) { return x / y; });
 
 
+    Code.prototype.stop = function () {
+        this.funcs.push(function (e) {
+            e.pause();
+
+            return e.curLine;
+        });
+
+        return this;
+    };
+
+
+    Code.prototype.aCall = function (lineNo, f) {
+        this.funcs.push(function (e) {
+            if (typeof f === "function") {
+                e.args = f(e);
+            }
+
+            e.aCall();
+
+            return lineNo;
+        });
+
+        return this;
+    };
+
+
+    Code.prototype.implicitReturn = function (f) {
+        var func = function (e) {
+            var ret;
+
+            if (typeof f === "function") {
+                ret = f(e);
+            }
+
+            return e.aReturn(ret);
+        };
+
+        func.isSkip = true;
+
+        this.funcs.push(func);
+
+        return this;
+    };
+
+
+    Code.prototype.aReturn = function (f) {
+        this.funcs.push(function (e) {
+            var ret;
+
+            if (typeof f === "function") {
+                ret = f(e);
+            }
+
+            return e.aReturn(ret);
+        });
+
+        return this;
+    };
+
+
     Code.prototype.aFor = function (times) {
         var i = 0;
         var obj = {};
@@ -188,7 +271,7 @@
 
         var f = function () { return aFor.i; };
 
-        f.isEndLoop = true;
+        f.isSkip = true;
 
         this.funcs.push(f);
 
@@ -228,7 +311,7 @@
 
         var f = function () { return aWhile.i; };
 
-        f.isEndLoop = true;
+        f.isSkip = true;
 
         this.funcs.push(f);
 
@@ -289,7 +372,7 @@
 
         var f = function () { return foreach.i; };
 
-        f.isEndLoop = true;
+        f.isSkip = true;
 
         this.funcs.push(f);
 
