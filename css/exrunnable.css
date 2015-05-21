@@ -26,6 +26,7 @@
 
 
 textarea.exr-console {
+    width: 100%;
     color: #FFF;
     background-color: #333;
 }

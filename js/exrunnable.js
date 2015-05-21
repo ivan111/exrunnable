@@ -2,119 +2,229 @@
     "use strict";
 
     window.exr = {
+        createEnv: createEnv,
         create: create
     };
 
 
-    var DEFAULT_ENV = {
-        container: null,
-        example: null,
-        startLine: 0,
-        setup: function () {},
-        code: null,
-        frames: [],
-        maxVarsNum: 5,
-        showConsole: true,
-        consoleCols: 80,
-        consoleRows: 8,
-        showVarsTable: true,
-        showRunButton: false,
-        runClock: 10,
-        curLineColor: "#DDF"
-    };
+    var eventNames = ["Run", "Pause", "Reset", "Call", "Return", "Print", "Complete", "Error"];
+
+
+    function createEnv(container, codeTable, code) {
+        return {
+            container: container,
+            codeTable: codeTable,
+            code: code,
+            startLine: 0,
+            setup: function () {},
+
+            runClock: 10,
+            curLineColor: "#DDF",
+
+            panels: {
+                buttons: { order: 1, init: exr.initButtons, isBefore: true, showRunButton: false },
+                varsTable: { order: 2, init: exr.initVarsTable },
+                console: { order: 3, init: exr.initConsole, cols: 80, rows: 8 }
+            }
+        };
+    }
 
 
     function create(env) {
-        mergeDict(env, DEFAULT_ENV);
+        env.code.asert();
+
+        initMethods(env);
+
+        eventNames.forEach(function (eventName) {
+            helpers.createEvent(env, eventName);
+        });
 
         env.isRunning = false;
+        env.frames = [];
+        env.breakpoints = [];
+        env.numLines = env.codeTable.rows.length;
+
+        env.vars = exr.createVars(env);
+
+        setOnLineNoClick(env);
+
+        var panels = toPanelsArray(env.panels);
+
+        panels.forEach(function (conf) {
+            if (!conf.hide) {
+                conf.init(env, conf);
+            }
+        });
+
+        env.setup();
+
+        env.setCurrentLine(env.startLine);
+        env.curFuncIndex = 0;
+    }
+
+
+    function setOnLineNoClick(env) {
+        if (!helpers.hasClass(env.codeTable.rows[0].cells[0], "linenos")) {
+            return;
+        }
+
+        for (var i = 0; i < env.codeTable.rows.length; i++) {
+            var row = env.codeTable.rows[i];
+            row.onclick = createOnLineNoClick(env, row, i);
+        }
+    }
+
+
+    function createOnLineNoClick(env, row, i) {
+        return function () {
+            if (env.breakpoints[i]) {
+                helpers.removeClass(row, "breakpoint");
+                env.breakpoints[i] = false;
+            } else {
+                helpers.addClass(row, "breakpoint");
+                env.breakpoints[i] = true;
+            }
+        };
+    }
+
+
+    function toPanelsArray(panels) {
+        var keys = Object.keys(panels);
+        var arr = keys.map(function(key) { return panels[key]; });
+
+        arr.sort(function (a, b) {
+            var ao = a.order || 100;
+            var bo = b.order || 100;
+
+            return ao - bo;
+        });
+
+        return arr;
+    }
+
+
+    function initMethods(env) {
         env.setCurrentLine = setCurrentLine;
-        env.consoleText = "";
-        env.vars = {};
-        env.varsList = [];
         env.step = step;
         env.run = run;
         env.pause = pause;
         env.reset = reset;
         env.aCall = aCall;
         env.aReturn = aReturn;
-        env.assign = assign;
         env.print = print;
-
-        env.onCreateVarListeners = [];
-        env.onChangeVarListeners = [];
-        env.onCompleteListeners = [];
-        env.addChangeVarListener = addChangeVarListener;
-        env.notifyCreateVar = notifyCreateVar;
-        env.notifyChangeVar = notifyChangeVar;
-        env.notifyComplete = notifyComplete;
-
-        env.numLines = addLineTags(env.example);
-
-        createControlPanel(env);
-
-        if (env.showVarsTable) {
-            createVarsTable(env);
-            env.onCreateVarListeners.push(onCreateVar);
-            env.onChangeVarListeners.push(onChangeVar);
-        }
-
-        if (env.showConsole) {
-            createConsolePanel(env);
-        }
-
-        env.setup();
-
-        env.setCurrentLine(env.startLine);
+        env.createPanel = createPanel;
     }
 
 
     function step() {
-        var nextLine = this.curLine + 1;
+        try {
+            var jmp = runLine(this, this.curLine, this.curFuncIndex);
 
-        var before = this.code.beforeFuncs[this.curLine];
-        var f = this.code.funcs[this.curLine];
-        var after = this.code.afterFuncs[this.curLine];
-        var iUndef;
+            var result = parseJmp(this, jmp, this.curLine);
+            var nextLine = result.lineNo;
+            var funcIndex = result.funcIndex;
 
-        while (f) {
-            if (before) {
-                before(this);
+            result = runSkip(this, nextLine, funcIndex);
+            nextLine = result.lineNo;
+
+            this.setCurrentLine(nextLine);
+            this.curFuncIndex = result.funcIndex;
+
+            if (this.isRunning && this.breakpoints[this.curLine]) {
+                this.pause();
             }
 
-            var i = f(this);
-
-            if (after) {
-                after(this);
+            if (this.isRunning && this.curLine >= this.code.funcs.length) {
+                this.notifyComplete(this);
+            }
+        } catch (e) {
+            if (this.isRunning) {
+                this.pause();
             }
 
-            if (typeof i !== "undefined") {
-                iUndef = false;
-                nextLine = i;
-            } else {
-                iUndef = true;
-                i = nextLine;
-                nextLine++;
+            this.notifyError(e);
+        }
+    }
+
+
+    function runLine(env, lineNo, funcIndex) {
+        var funcList = env.code.funcs[lineNo];
+
+        if (!funcList) {
+            return undefined;
+        }
+
+        for (var i = funcIndex; i < funcList.length; i++) {
+            var f = funcList[i];
+            var jmp = f(env);
+
+            if (!helpers.isNullOrUndef(jmp)) {
+                return jmp;
+            }
+        }
+    }
+
+
+    function runSkip(env, lineNo, funcIndex) {
+        for (;;) {
+            var funcList = env.code.funcs[lineNo];
+
+            if (!funcList) {
+                return {
+                    lineNo: lineNo,
+                    funcIndex: 0
+                };
             }
 
-            before = this.code.beforeFuncs[i];
-            f = this.code.funcs[i];
-            after = this.code.afterFuncs[i];
+            var jmp = null;
 
-            if (!(f && f.isSkip)) {
-                if (iUndef) {
-                    nextLine--;
+            for (var i = funcIndex; i < funcList.length; i++) {
+                var f = funcList[i];
+
+                if (!f.isSkip) {
+                    return {
+                        lineNo: lineNo,
+                        funcIndex: i
+                    };
                 }
 
-                break;
+                jmp = f(env);
+
+                if (!helpers.isNullOrUndef(jmp)) {
+                    break;
+                }
             }
+
+            var result = parseJmp(env, jmp, lineNo);
+            lineNo = result.lineNo;
+            funcIndex = result.funcIndex;
+        }
+    }
+
+
+    function parseJmp(env, jmp, curLine) {
+        if (helpers.isNullOrUndef(jmp)) {
+            return {
+                lineNo: curLine + 1,
+                funcIndex: 0
+            };
         }
 
-        this.setCurrentLine(nextLine);
-
-        if (this.isRunning && this.curLine >= this.code.funcs.length) {
-            this.notifyComplete();
+        if (typeof jmp === "number") {
+            return {
+                lineNo: Math.floor(jmp),
+                funcIndex: 0
+            };
         }
+
+        if (typeof jmp === "string" || jmp instanceof String) {
+            return env.code.labels[jmp];
+        }
+
+        return {
+            lineNo: jmp[0],
+            funcIndex: jmp[1]
+        };
     }
 
 
@@ -127,9 +237,7 @@
                 env.step();
             }, 1000 / this.runClock);
 
-            if (this.runBtn) {
-                this.runBtn.value = "pause";
-            }
+            this.notifyRun(this);
         }
     }
 
@@ -139,9 +247,7 @@
             this.isRunning = false;
             clearInterval(this.runTimerId);
 
-            if (this.runBtn) {
-                this.runBtn.value = "run";
-            }
+            this.notifyPause(this);
         }
     }
 
@@ -149,32 +255,26 @@
     function reset() {
         this.code.reset();
 
-        if (this.showConsole) {
-            this.console.innerHTML = "";
-            this.consoleText = "";
-        }
-
         this.setCurrentLine(this.startLine);
 
-        this.vars = {};
-        this.varsList = [];
-        clearVarsTable(this);
+        this.notifyReset(this);
 
         this.setup();
     }
 
 
-    function aCall() {
+    function aCall(retAddr, args) {
         this.frames.push({
-            retLineNo: this.curLine + 1,
-            vars: this.vars,
-            varsList: this.varsList
+            retAddr: retAddr
         });
 
-        this.vars = {};
-        this.varsList = [];
+        this.notifyCall(this);
 
-        clearVarsTable(this, true);
+        if (args) {
+            for (var key in args) {
+                this.vars(key, args[key]);
+            }
+        }
     }
 
 
@@ -182,292 +282,60 @@
         var frame = this.frames.pop();
 
         this.ret = ret;
-        this.vars = frame.vars;
-        this.varsList = frame.varsList;
 
-        clearVarsTable(this, true);
+        this.notifyReturn(this);
 
-        return frame.retLineNo;
-    }
-
-
-    function assign(varName, val) {
-        if (!(varName in this.vars)) {
-            this.varsList.push(varName);
-            this.vars[varName] = val;
-            this.notifyCreateVar(varName, val);
-            this.notifyChangeVar(varName, val);
-        } else {
-            this.vars[varName] = val;
-            this.notifyChangeVar(varName, val);
-        }
+        return frame.retAddr;
     }
 
 
     function print(s, newline) {
-        if (!this.showConsole) {
-            return;
-        }
-
-
-        s = formatVarVal(s, true);
-
         if (newline) {
             s += "\n";
         }
 
-        this.consoleText += s;
-        this.console.innerHTML = this.consoleText;
-
-        this.console.scrollTop = this.console.scrollHeight;
-    }
-
-
-    function onCreateVar(env, varName, val) {
-        if (env.varsList.length <= env.maxVarsNum) {
-            var tr = env.varsTable.getElementsByClassName("exr-vars-" + (env.varsList.length - 1))[0];
-
-            tr.childNodes[0].innerHTML = varName;
-            tr.childNodes[1].innerHTML = formatVarVal(val);
-        }
-    }
-
-
-    function onChangeVar(env, varName, val) {
-        if (varName in env.vars) {
-            var i = getVarIndex(env.varsList, varName);
-
-            if (i !== -1 && i <= env.maxVarsNum) {
-                var tr = env.varsTable.getElementsByClassName("exr-vars-" + i)[0];
-
-                tr.childNodes[0].innerHTML = varName;
-                tr.childNodes[1].innerHTML = formatVarVal(val);
-            }
-        }
-    }
-
-
-    function formatVarVal(val, isConsole) {
-        if (typeof val === "string") {
-            if (!isConsole) {
-                val = ["\"", val, "\""].join("");
-            }
-        } else if (Object.prototype.toString.call(val) === "[object Array]") {
-            val = ["[", val, "]"].join("");
-        } else if (typeof val === "object") {
-            var arr = ["{"];
-            var first = true;
-
-            for (var key in val) {
-                if (first) {
-                    first = false;
-                } else {
-                    arr.push(", ");
-                }
-
-                arr.push(key);
-                arr.push(": ");
-                arr.push(formatVarVal(val[key], isConsole));
-            }
-
-            arr.push("}");
-
-            val = arr.join("");
-        } else {
-            val = "" + val;
-        }
-
-        if (!isConsole) {
-            val = val.replace("\n", "\\n");
-        }
-
-        return val;
-    }
-
-
-    function getVarIndex(varsList, varName) {
-        for (var i = 0; i < varsList.length; i++) {
-            if (varsList[i] === varName) {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-
-    function addChangeVarListener(listener) {
-        this.onChangeVarListeners.push(listener);
-    }
-
-
-    function notifyCreateVar(varName, val) {
-        var env = this;
-
-        this.onCreateVarListeners.forEach(function (listener) {
-            listener(env, varName, val);
-        });
-    }
-
-
-    function notifyChangeVar(varName, val) {
-        var env = this;
-
-        this.onChangeVarListeners.forEach(function (listener) {
-            listener(env, varName, val);
-        });
-    }
-
-
-    function notifyComplete() {
-        var env = this;
-
-        this.onCompleteListeners.forEach(function (listener) {
-            listener(env);
-        });
-    }
-
-
-    function createVarsTable(env) {
-        var arr = [];
-
-        arr.push("<tr><th>Name</th><th>Value</th></tr>");
-
-        for (var i = 0; i < env.maxVarsNum; i++) {
-            arr.push("<tr class='exr-vars-");
-            arr.push(i);
-            arr.push("'><td>　</td><td>　</td></tr>");
-        }
-
-        var div = document.createElement("div");
-        div.className = "exr-panel";
-
-        var table = document.createElement("table");
-        table.className = "exr-table";
-        table.innerHTML = arr.join("");
-        div.appendChild(table);
-
-        env.container.appendChild(div);
-        env.varsTable = table;
-    }
-
-
-    function clearVarsTable(env, isUpdate) {
-        if (!env.showVarsTable) {
-            return;
-        }
-
-        for (var i = 0; i < env.maxVarsNum; i++) {
-            var tr = env.varsTable.getElementsByClassName("exr-vars-" + i)[0];
-
-            if (isUpdate && i < env.varsList.length) {
-                var name = env.varsList[i];
-                var val = formatVarVal(env.vars[name]);
-
-                tr.childNodes[0].innerHTML = name;
-                tr.childNodes[1].innerHTML = val;
-            } else {
-                tr.childNodes[0].innerHTML = "　";
-                tr.childNodes[1].innerHTML = "　";
-            }
-        }
+        this.notifyPrint(this, s);
     }
 
 
     function setCurrentLine(curLine) {
-        var nodes = this.example.getElementsByClassName("exr-line-" + this.curLine);
+        var row = getCodeTableRow(this, this.curLine);
 
-        if (nodes.length === 1) {
-            nodes[0].style.backgroundColor = "";
+        if (row) {
+            helpers.removeClass(row, "selected");
         }
 
         this.curLine = curLine;
 
-        nodes = this.example.getElementsByClassName("exr-line-" + this.curLine);
+        row = getCodeTableRow(this, this.curLine);
 
-        if (nodes.length === 1) {
-            nodes[0].style.backgroundColor = this.curLineColor;
+        if (row) {
+            helpers.addClass(row, "selected");
         }
     }
 
 
-    function addLineTags(example) {
-        var htmlLines = example.innerHTML.split("\n");
+    function getCodeTableRow(env, i) {
+        if (typeof i === "undefined" || i < 0 || i >= env.numLines) {
+            return null;
+        }
 
-        var textLines;
+        return env.codeTable.rows[i];
+    }
 
-        if (typeof example.innerText === "undefined") {
-            textLines = example.textContent.split("\n");
+
+    function createPanel(isBefore) {
+        var div = document.createElement("div");
+        div.className = "exr-panel";
+
+        var p = this.container;
+
+        if (isBefore) {
+            p.insertBefore(div, p.firstChild);
         } else {
-            textLines = example.innerText.split("\n");
+            p.appendChild(div);
         }
 
-        var html = [];
-
-        textLines.forEach(function (line, lineNo) {
-            var space = "";
-
-            if (line.length < 80) {
-                space = Array(80 - line.length + 1).join(" ");
-            }
-
-            html.push(["<span class='exr-line-", lineNo, "'>", htmlLines[lineNo], space, "</span>"].join(""));
-        });
-
-        example.innerHTML = html.join("\n");
-
-        return textLines.length;
-    }
-
-
-    function createControlPanel(env) {
-        var div = document.createElement("div");
-        div.className = "exr-panel";
-        div.innerHTML = "<input class='step-button' type='button' value='step' />" +
-                        (env.showRunButton ? "<input class='run-button' type='button' value='run' />" : "") +
-                        "<input class='reset-button' type='button' value='reset' />";
-
-        env.container.appendChild(div);
-        env.container.insertBefore(div, env.container.firstChild);
-
-        var stepBtn = div.getElementsByClassName("step-button")[0];
-        stepBtn.onclick = function () { env.step(); };
-
-        if (env.showRunButton) {
-            env.runBtn = div.getElementsByClassName("run-button")[0];
-            env.runBtn.onclick = function () {
-                if (env.isRunning) {
-                    env.pause();
-                } else {
-                    env.run();
-                }
-            };
-
-            env.onCompleteListeners.push(function () { env.pause(); });
-        }
-
-        var resetBtn = div.getElementsByClassName("reset-button")[0];
-        resetBtn.onclick = function () { env.reset(); };
-    }
-
-
-    function createConsolePanel(env) {
-        var div = document.createElement("div");
-        div.className = "exr-panel";
-        div.innerHTML = ["<textarea class='exr-console' readonly cols='",
-            env.consoleCols, "' rows='", env.consoleRows, "'></textarea>"].join("");
-
-        env.console = div.getElementsByClassName("exr-console")[0];
-
-        env.container.appendChild(div);
-    }
-
-
-    function mergeDict(dict1, dict2) {
-        for (var key in dict2) {
-            if (!(key in dict1)) {
-                dict1[key] = dict2[key];
-            }
-        }
+        return div;
     }
 })();

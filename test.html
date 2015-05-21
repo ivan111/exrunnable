@@ -5,99 +5,111 @@
 
 <title>exrunnable</title>
 
+<link rel="stylesheet" href="css/main.css" type="text/css"/>
 <link rel="stylesheet" href="css/exrunnable.css" type="text/css"/>
+<link rel="stylesheet" href="css/highlight.css" type="text/css"/>
 
+<script src="js/helpers.js"></script>
 <script src="js/exrunnable.js"></script>
+<script src="js/vars.js"></script>
+<script src="js/panel-buttons.js"></script>
+<script src="js/panel-vars.js"></script>
+<script src="js/panel-console.js"></script>
 <script src="js/code.js"></script>
 
 <script type="text/javascript">
 window.onload = function () {
   var code = new exr.Code()
-    .foreach("n", [0, 1, 2, 3])
-      .aIf(function (e) { return e.vars.n === 0; })
-        .print("0")
-      .elif(function (e) { return e.vars.n === 1; })
-        .print("1")
-      .elif(function (e) { return e.vars.n === 2; })
-        .print("2")
-      .aElse()
-        .print("3")
-      .endIf(true)
-    .endForeach()
+    .foreach("n", [0, 1, 2, 3]).nl()
+      .aIf(exr.cond("n", "==", 0)).nl()
+        .print("0").nl()
+      .elif(exr.cond("n", "==", 1)).nl()
+        .print("1").nl()
+      .elif(exr.cond("n", "==", 2)).nl()
+        .print("2").nl()
+      .aElse().nl()
+        .print("3").endIf().endForeach().nl()
+    .skip(1)
     .print("4");
 
-  var env = {
-    container: document.getElementById("container1"),
-    example: document.getElementById("example1"),
-    maxVarsNum: 1,
-    showRunButton: true,
-    code: code
-  };
+  var container = document.getElementById("container1");
+  var codeTable = document.getElementById("code-table1");
+
+  var env = exr.createEnv(container, codeTable, code);
+  env.panels.buttons.showRunButton = true;
 
   exr.create(env);
 
 
   code = new exr.Code()
-    .assign("i", 0)
-    .aWhile(function (e) { return e.vars.i !== 3; })
-      .print(function (e) { return e.vars.i; })
-      .add("i", 1)
-    .endWhile();
+    .vars("i", 0).nl()
+    .aWhile(exr.cond("i", "!=", 3)).nl()
+      .printVar("i").nl()
+      .add("i", 1).endWhile();
 
-  env = {
-    container: document.getElementById("container2"),
-    example: document.getElementById("example2"),
-    maxVarsNum: 1,
-    showRunButton: true,
-    code: code
-  };
+  container = document.getElementById("container2");
+  codeTable = document.getElementById("code-table2");
+
+  env = exr.createEnv(container, codeTable, code);
+  env.panels.buttons.showRunButton = true;
 
   exr.create(env);
 
 
   code = new exr.Code()
-    .aFor(5)
-      .print("hello\n")
-    .endFor();
+    .aFor(5).nl()
+      .print("hello\n").endFor();
 
-  env = {
-    container: document.getElementById("container3"),
-    example: document.getElementById("example3"),
-    maxVarsNum: 1,
-    showVarsTable: false,
-    showRunButton: true,
-    code: code
-  };
+  container = document.getElementById("container3");
+  codeTable = document.getElementById("code-table3");
+
+  env = exr.createEnv(container, codeTable, code);
+  env.panels.varsTable.hide = true;
+  env.panels.buttons.showRunButton = true;
 
   exr.create(env);
 
 
 
-  var code = new exr.Code()
-    .foreach("n", [0, 1, 2, 3])
-      .aIf(function (e) { return e.vars.n === 0; })
-        .print("0")
-      .elif(function (e) { return e.vars.n === 1; })
-        .breakForeach()
-      .elif(function (e) { return e.vars.n === 2; })
-        .print("2")
-      .aElse()
-        .print("3")
-      .endIf(true)
-    .endForeach()
+  code = new exr.Code()
+    .foreach("n", [0, 1, 2, 3]).nl()
+      .aIf(exr.cond("n", "==", 0)).nl()
+        .print("0").nl()
+      .elif(exr.cond("n", "==", 1)).nl()
+        .breakForeach().nl()
+      .elif(exr.cond("n", "==", 2)).nl()
+        .print("2").nl()
+      .aElse().nl()
+        .print("3").endIf().endForeach().nl()
+    .skip(1)
     .print("4");
 
-  var env = {
-    container: document.getElementById("container4"),
-    example: document.getElementById("example4"),
-    maxVarsNum: 1,
-    showRunButton: true,
-    code: code
-  };
+  container = document.getElementById("container4");
+  codeTable = document.getElementById("code-table4");
+
+  env = exr.createEnv(container, codeTable, code);
+  env.panels.buttons.showRunButton = true;
 
   exr.create(env);
 
 
+
+  code = new exr.Code()
+    .aCall(3, function (e) { return { n: 4 }; }).print(function (e) { return e.ret; }).nl()
+    .jump(100).nl()
+    .skip(1)
+    .aIf(exr.cond("n", "==", 1)).nl()
+      .aReturn(1).nl()
+    .aElse().nl()
+      .aCall(3, function (e) { return { n: e.vars("n") - 1}; }).aReturn(function (e) { return e.ret * e.vars("n") }).endIf();
+
+  container = document.getElementById("container5");
+  codeTable = document.getElementById("code-table5");
+
+  env = exr.createEnv(container, codeTable, code);
+  env.panels.buttons.showRunButton = true;
+
+  exr.create(env);
 };
 </script>
 
@@ -105,62 +117,99 @@ window.onload = function () {
 
 <body>
 
-<div id="container1">
+<div class="site">
 
-<div class="code-container"><pre id="example1">for n in [0, 1, 2, 3]:
-    if n == 0:
-        print("0")
-    elif n == 1:
-        print("1")
-    elif n == 2:
-        print("2")
-    else:
-        print("3")
+  <header>
+    <a href="/">HOME</a> &gt;
+    <h1 class="title">exrunnable</h1>
+  </header>
 
-print("4")</pre></div>
+
+  <section>
+    <div id="container1">
+
+      <table id="code-table1" class="highlighttable highlight">
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]:</span></pre></td></tr>
+        <tr><td class="linenos">2</td><td class="code"><pre>    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">3</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;0&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">4</td><td class="code"><pre>    <span class="k">elif</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">5</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;1&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">6</td><td class="code"><pre>    <span class="k">elif</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">7</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;2&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">8</td><td class="code"><pre>    <span class="k">else</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">9</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;3&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">10</td><td class="code"></td></tr>
+        <tr><td class="linenos">11</td><td class="code"><pre><span class="k">print</span><span class="p">(</span><span class="s">&quot;4&quot;</span><span class="p">)</span></pre></td></tr>
+      </table>
+
+    </div>
+
+
+
+    <div id="container2">
+
+      <table id="code-table2" class="highlighttable highlight">
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span></pre></td></tr>
+        <tr><td class="linenos">2</td><td class="code"><pre><span class="k">while</span> <span class="n">i</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">3</td><td class="code"><pre>  <span class="k">print</span><span class="p">(</span><span class="n">i</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">4</td><td class="code"><pre>  <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span></pre></td></tr>
+      </table>
+
+    </div>
+
+
+
+    <div id="container3">
+
+      <table id="code-table3" class="highlighttable highlight">
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">for</span> <span class="mi">5</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">2</td><td class="code"><pre>  <span class="k">print</span><span class="p">(</span><span class="s">&quot;hello</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span></pre></td></tr>
+      </table>
+
+    </div>
+
+
+
+    <div id="container4">
+
+      <table id="code-table4" class="highlighttable highlight">
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]:</span></pre></td></tr>
+        <tr><td class="linenos">2</td><td class="code"><pre>    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">3</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;0&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">4</td><td class="code"><pre>    <span class="k">elif</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">5</td><td class="code"><pre>        <span class="k">break</span></pre></td></tr>
+        <tr><td class="linenos">6</td><td class="code"><pre>    <span class="k">elif</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">7</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;2&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">8</td><td class="code"><pre>    <span class="k">else</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">9</td><td class="code"><pre>        <span class="k">print</span><span class="p">(</span><span class="s">&quot;3&quot;</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">10</td><td class="code"></td></tr>
+        <tr><td class="linenos">11</td><td class="code"><pre><span class="k">print</span><span class="p">(</span><span class="s">&quot;4&quot;</span><span class="p">)</span></pre></td></tr>
+      </table>
+
+    </div>
+
+
+    <div id="container5">
+      <table id="code-table5" class="highlighttable highlight">
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">print</span><span class="p">(</span><span class="n">fact</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">2</td><td class="code"></td></tr>
+        <tr><td class="linenos">3</td><td class="code"><pre><span class="k">def</span> <span class="nf">fact</span><span class="p">(</span><span class="n">n</span><span class="p">):</span></pre></td></tr>
+        <tr><td class="linenos">4</td><td class="code"><pre>    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">5</td><td class="code"><pre>        <span class="k">return</span> <span class="mi">1</span></pre></td></tr>
+        <tr><td class="linenos">6</td><td class="code"><pre>    <span class="k">else</span><span class="p">:</span></pre></td></tr>
+        <tr><td class="linenos">7</td><td class="code"><pre>        <span class="k">return</span> <span class="n">n</span> <span class="o">*</span> <span class="n">fact</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></pre></td></tr>
+      </table>
+
+    </div>
+  </section>
+
+  <footer>
+    <div class="contact">
+      <p><a href="/pm/postmail.html">メッセージを送る</a>　作成日:2015-05-20</p>
+    </div>
+  </footer>
 
 </div>
-
-
-
-<div id="container2">
-
-<div class="code-container"><pre id="example2">i = 0
-while i != 3:
-  print(i)
-  i += 1
-</pre></div>
-
-</div>
-
-
-
-<div id="container3">
-
-<div class="code-container"><pre id="example3">for 5:
-  print("hello\n")
-</pre></div>
-
-</div>
-
-
-
-<div id="container4">
-
-<div class="code-container"><pre id="example4">for n in [0, 1, 2, 3]:
-    if n == 0:
-        print("0")
-    elif n == 1:
-        break
-    elif n == 2:
-        print("2")
-    else:
-        print("3")
-
-print("4")</pre></div>
-
-</div>
-
 
 </body>
 

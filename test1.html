@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<title>exrunnable</title>
+
+<link rel="stylesheet" href="css/main.css" type="text/css"/>
+<link rel="stylesheet" href="css/exrunnable.css" type="text/css"/>
+<link rel="stylesheet" href="css/highlight.css" type="text/css"/>
+
+<style>
+.exr-panel {
+  width: 100%;
+}
+
+table.exr-table {
+  width: 100%;
+}
+</style>
+
+<script src="js/helpers.js"></script>
+<script src="js/exrunnable.js"></script>
+<script src="js/vars.js"></script>
+<script src="js/panel-buttons.js"></script>
+<script src="js/panel-vars.js"></script>
+<script src="js/panel-console.js"></script>
+<script src="js/code.js"></script>
+
+<script src="test_js/test1.js"></script>
+
+<script type="text/javascript">
+window.onload = function () {
+  var container = document.getElementById("container");
+  var codeTable = document.getElementById("code-table");
+
+  test1(container, codeTable);
+};
+</script>
+
+</head>
+
+<body>
+
+
+
+
+<div class="site">
+
+  <header>
+    <a href="/">HOME</a> &gt;
+    <h1 class="title">exrunnable</h1>
+  </header>
+
+
+  <section>
+    <table id="code-table" class="highlighttable highlight" style="width: auto; display: inline-block;">
+      <tr><td class="linenos">1</td><td class="code"><pre><span class="c">#!/usr/bin/env python</span></pre></td></tr>
+      <tr><td class="linenos">2</td><td class="code"></td></tr>
+      <tr><td class="linenos">3</td><td class="code"><pre><span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;hankaku.c&#39;</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">4</td><td class="code"></td></tr>
+      <tr><td class="linenos">5</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#define X )*2+1</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">6</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#define _ )*2</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">7</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#define s ((((((((0</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">8</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">9</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;char hankaku[4096] = {</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">10</td><td class="code"></td></tr>
+      <tr><td class="linenos">11</td><td class="code"><pre><span class="n">i</span> <span class="o">=</span> <span class="mi">1</span></pre></td></tr>
+      <tr><td class="linenos">12</td><td class="code"><pre><span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;hankaku.txt&#39;</span><span class="p">,</span> <span class="s">&#39;r&#39;</span><span class="p">):</span></pre></td></tr>
+      <tr><td class="linenos">13</td><td class="code"><pre>    <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span></pre></td></tr>
+      <tr><td class="linenos">14</td><td class="code"></td></tr>
+      <tr><td class="linenos">15</td><td class="code"><pre>    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">&#39;char&#39;</span><span class="p">):</span></pre></td></tr>
+      <tr><td class="linenos">16</td><td class="code"><pre>        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">/* &#39;</span> <span class="o">+</span> <span class="n">line</span> <span class="o">+</span> <span class="s">&#39; */</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">17</td><td class="code"><pre>    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="o">==</span> <span class="mi">8</span><span class="p">:</span></pre></td></tr>
+      <tr><td class="linenos">18</td><td class="code"><pre>        <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">,</span> <span class="s">&#39;_&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&#39;*&#39;</span><span class="p">,</span> <span class="s">&#39;X&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">19</td><td class="code"><pre>        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;s   &#39;</span> <span class="o">+</span> <span class="s">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">line</span><span class="p">))</span></pre></td></tr>
+      <tr><td class="linenos">20</td><td class="code"><pre>        <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="mi">4096</span><span class="p">:</span></pre></td></tr>
+      <tr><td class="linenos">21</td><td class="code"><pre>            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;   ,</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">22</td><td class="code"><pre>        <span class="k">else</span><span class="p">:</span></pre></td></tr>
+      <tr><td class="linenos">23</td><td class="code"><pre>            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">24</td><td class="code"><pre>        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span></pre></td></tr>
+      <tr><td class="linenos">25</td><td class="code"></td></tr>
+      <tr><td class="linenos">26</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;};</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">27</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">28</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#undef X</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">29</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#undef _</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">30</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s">&#39;#undef s</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span></pre></td></tr>
+      <tr><td class="linenos">31</td><td class="code"></td></tr>
+      <tr><td class="linenos">32</td><td class="code"><pre><span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></pre></td></tr>
+    </table>
+
+     <div id="container" style="width: 360px; display: inline-block; vertical-align: top; margin-left: 20px;"></div>
+  </section>
+
+  <footer>
+    <div class="contact">
+      <p><a href="/pm/postmail.html">メッセージを送る</a>　作成日:2015-05-20</p>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+
+</html>

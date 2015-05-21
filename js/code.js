@@ -2,12 +2,13 @@
     "use strict";
 
     exr.Code = Code;
+    exr.cond = cond;
 
 
     function Code() {
-        this.funcs = [];
-        this.beforeFuncs = [];
-        this.afterFuncs = [];
+        // funcs[0]はコードの１行目で、関数の配列。
+        this.funcs = [[]];
+
         this.forStack = [];
         this.whileStack = [];
         this.foreachStack = [];
@@ -25,22 +26,48 @@
     }
 
 
-    function seq() {
-        var args = arguments;
+    function cond(varName, op, constVal) {
+        if (op === "==") {
+            return function (e) {
+                return e.vars(varName) === constVal;
+            };
+        }
 
-        return function (e) {
-            for (var i = 0; i < args.length; i++) {
-                var nextLine = args[i](e);
+        if (op === "!=") {
+            return function (e) {
+                return e.vars(varName) !== constVal;
+            };
+        }
 
-                if (nextLine) {
-                    return nextLine;
-                }
-            }
-        };
+        if (op === "<") {
+            return function (e) {
+                return e.vars(varName) < constVal;
+            };
+        }
+
+        if (op === "<=") {
+            return function (e) {
+                return e.vars(varName) <= constVal;
+            };
+        }
+
+        if (op === ">") {
+            return function (e) {
+                return e.vars(varName) > constVal;
+            };
+        }
+
+        if (op === ">=") {
+            return function (e) {
+                return e.vars(varName) >= constVal;
+            };
+        }
+
+        throw "unknown op: " + op;
     }
 
 
-    Code.prototype.check = function () {
+    Code.prototype.asert = function () {
         if (this.forStack.length !== 0) {
             throw "forStack.length = " + this.forStack.length;
         }
@@ -60,43 +87,53 @@
 
 
     Code.prototype.reset = function () {
-        this.funcs.forEach(function (f) {
-            if (f.reset) {
-                f.reset();
-            }
+        this.funcs.forEach(function (funcList) {
+            funcList.forEach(function (f) {
+                if (f.reset) {
+                    f.reset();
+                }
+            });
         });
     };
 
 
-    Code.prototype.getCurIndex = function () {
+    Code.prototype.getCurPos = function () {
+        return [this.funcs.length - 1, this.funcs[this.funcs.length - 1].length - 1];
+    };
+
+
+    Code.prototype.getCurLineNo = function () {
         return this.funcs.length - 1;
     };
 
 
-    Code.prototype.before = function (f) {
-        var i = this.funcs.length;
-
-        this.beforeFuncs[i] = f;
-
-        return this;
+    Code.prototype.getCurFuncIndex = function () {
+        return this.funcs[this.funcs.length - 1].length - 1;
     };
 
 
-    Code.prototype.after = function (f) {
-        var i = this.funcs.length - 1;
-
-        if (i === -1) {
-            throw "after -1";
+    // 処理を追加
+    Code.prototype.a = function (func, lineNo) {
+        if (arguments.length === 1) {
+            lineNo = this.getCurLineNo();
         }
 
-        this.afterFuncs[i] = f;
+        var line = this.funcs[lineNo];
+
+        if (typeof line === "undefined") {
+            line = [];
+            this.funcs[lineNo] = line;
+        }
+
+        line.push(func);
 
         return this;
     };
 
 
-    Code.prototype.a = function (f) {
-        this.funcs.push(f);
+    // newline
+    Code.prototype.nl = function () {
+        this.funcs.push([]);
 
         return this;
     };
@@ -104,7 +141,7 @@
 
     Code.prototype.skip = function (numLines) {
         for (var i = 0; i < numLines; i++) {
-            this.funcs.push(SKIP);
+            this.a(SKIP).nl();
         }
 
         return this;
@@ -112,7 +149,7 @@
 
 
     Code.prototype.print = function (f, newline) {
-        this.funcs.push(function (e) {
+        this.a(function (e) {
             var s;
 
             if (typeof f === "function") {
@@ -136,7 +173,7 @@
 
 
     Code.prototype.printVar = function (varName, newline) {
-        this.print(function (e) { return e.vars[varName]; }, newline);
+        this.print(function (e) { return e.vars(varName); }, newline);
 
         return this;
     };
@@ -149,12 +186,12 @@
     };
 
 
-    Code.prototype.assign = function (varName, val) {
-        this.funcs.push(function (e) {
-            if (typeof val === "function") {
-                e.assign(varName, val(e));
+    Code.prototype.vars = function (varName, varValue) {
+        this.a(function (e) {
+            if (typeof varValue === "function") {
+                e.vars(varName, varValue(e));
             } else {
-                e.assign(varName, val);
+                e.vars(varName, varValue);
             }
         });
 
@@ -162,11 +199,11 @@
     };
 
 
-    // var = var op val
+    // var1 = var1 op val2
     function op2(op) {
-        return function (varName, val) {
-            this.assign(varName, function (e) {
-                return op(e.vars[varName], val);
+        return function (varName, varValue) {
+            this.vars(varName, function (e) {
+                return op(e.vars(varName), varValue);
             });
 
             return this;
@@ -174,6 +211,7 @@
     }
 
 
+    // add("x", 3)  =>  x = x + 3
     Code.prototype.add = op2(function (x, y) { return x + y; });
     Code.prototype.sub = op2(function (x, y) { return x - y; });
     Code.prototype.mul = op2(function (x, y) { return x * y; });
@@ -181,7 +219,7 @@
 
 
     Code.prototype.stop = function () {
-        this.funcs.push(function (e) {
+        this.a(function (e) {
             e.pause();
 
             return e.curLine;
@@ -191,16 +229,37 @@
     };
 
 
-    Code.prototype.aCall = function (lineNo, f) {
-        this.funcs.push(function (e) {
-            if (typeof f === "function") {
-                e.args = f(e);
+    Code.prototype.jump = function (lineNo) {
+        var f = function () {
+            return lineNo;
+        };
+
+        f.isSkip = true;
+
+        this.a(f);
+
+        return this;
+    };
+
+
+    Code.prototype.aCall = function (lineNo, args) {
+        var obj = {};
+
+        this.a(function (e) {
+            var a = args;
+
+            if (typeof args === "function") {
+                a = args(e);
             }
 
-            e.aCall();
+            e.aCall(obj.retAddr, a);
 
             return lineNo;
         });
+
+        this.a(SKIP);
+
+        obj.retAddr = this.getCurPos();
 
         return this;
     };
@@ -212,6 +271,8 @@
 
             if (typeof f === "function") {
                 ret = f(e);
+            } else {
+                ret = f;
             }
 
             return e.aReturn(ret);
@@ -219,18 +280,20 @@
 
         func.isSkip = true;
 
-        this.funcs.push(func);
+        this.a(func);
 
         return this;
     };
 
 
     Code.prototype.aReturn = function (f) {
-        this.funcs.push(function (e) {
+        this.a(function (e) {
             var ret;
 
             if (typeof f === "function") {
                 ret = f(e);
+            } else {
+                ret = f;
             }
 
             return e.aReturn(ret);
@@ -257,9 +320,9 @@
             i = 0;
         };
 
-        this.funcs.push(aFor);
+        this.a(aFor);
 
-        var forI = this.getCurIndex();
+        var forI = this.getCurLineNo();
         this.forStack.push({ i: forI, obj: obj });
 
         return this;
@@ -270,12 +333,12 @@
         var aFor = this.forStack.pop();
 
         var f = function () { return aFor.i; };
-
         f.isSkip = true;
 
-        this.funcs.push(f);
+        this.a(f);
+        this.a(SKIP);
 
-        aFor.obj.endI = this.getCurIndex() + 1;
+        aFor.obj.endI = this.getCurPos();
 
         return this;
     };
@@ -284,22 +347,22 @@
     Code.prototype.breakFor = function () {
         var aFor = this.forStack[this.forStack.length - 1];
 
-        this.funcs.push(function () { aFor.reset(); return aFor.obj.endI; });
+        this.a(function () { aFor.reset(); return aFor.obj.endI; });
 
         return this;
     };
 
 
-    Code.prototype.aWhile = function (cond) {
+    Code.prototype.aWhile = function (condFunc) {
         var obj = {};
 
-        this.funcs.push(function (e) {
-            if (!cond(e)) {
+        this.a(function (e) {
+            if (!condFunc(e)) {
                 return obj.endI;
             }
         });
 
-        var whileI = this.getCurIndex();
+        var whileI = this.getCurLineNo();
         this.whileStack.push({ i: whileI, obj: obj });
 
         return this;
@@ -310,12 +373,12 @@
         var aWhile = this.whileStack.pop();
 
         var f = function () { return aWhile.i; };
-
         f.isSkip = true;
 
-        this.funcs.push(f);
+        this.a(f);
+        this.a(SKIP);
 
-        aWhile.obj.endI = this.getCurIndex() + 1;
+        aWhile.obj.endI = this.getCurPos();
 
         return this;
     };
@@ -324,7 +387,7 @@
     Code.prototype.breakWhile = function () {
         var aWhile = this.whileStack[this.whileStack.length - 1];
 
-        this.funcs.push(function () { return aWhile.obj.endI; });
+        this.a(function () { return aWhile.obj.endI; });
 
         return this;
     };
@@ -348,7 +411,7 @@
                 return obj.endI;
             }
 
-            e.assign(varName, arr[i]);
+            e.vars(varName, arr[i]);
 
             i++;
         }
@@ -358,9 +421,9 @@
             arr = bkArr;
         };
 
-        this.funcs.push(foreach);
+        this.a(foreach);
 
-        var foreachI = this.getCurIndex();
+        var foreachI = this.getCurLineNo();
         this.foreachStack.push({ i: foreachI, obj: obj, reset: foreach.reset });
 
         return this;
@@ -371,12 +434,12 @@
         var foreach = this.foreachStack.pop();
 
         var f = function () { return foreach.i; };
-
         f.isSkip = true;
 
-        this.funcs.push(f);
+        this.a(f);
+        this.a(SKIP);
 
-        foreach.obj.endI = this.getCurIndex() + 1;
+        foreach.obj.endI = this.getCurPos();
 
         return this;
     };
@@ -385,86 +448,78 @@
     Code.prototype.breakForeach = function () {
         var foreach = this.foreachStack[this.foreachStack.length - 1];
 
-        this.funcs.push(function () { foreach.reset(); return foreach.obj.endI; });
+        this.a(function () { foreach.reset(); return foreach.obj.endI; });
 
         return this;
     };
 
 
-    Code.prototype.aIf = function (cond) {
+    Code.prototype.aIf = function (condFunc) {
         var obj = {};
 
-        this.funcs.push(function (e) {
-            if (!cond(e)) {
+        this.a(function (e) {
+            if (!condFunc(e)) {
                 return obj.elseI;
             }
         });
 
-        this.ifStack.push({ type: "if", obj: obj, chain: [] });
+        this.ifStack.push({ obj: obj, chain: [] });
 
         return this;
     };
 
 
-    Code.prototype.elif = function (cond) {
-        var obj = {};
-
+    // elifと同じ行に他の命令はないと仮定している
+    Code.prototype.elif = function (condFunc) {
         var aif = this.ifStack.pop();
 
+        var obj = {};
         var chain = aif.chain.concat([obj]);
+        this.ifStack.push({ obj: obj, chain: chain });
 
-        var last = this.getCurIndex();
+        var curLineNo = this.getCurLineNo();
+        aif.obj.elseI = curLineNo;
 
-        aif.obj.elseI = last + 1;
-
-        this.funcs.push(function (e) {
-            if (!cond(e)) {
+        this.a(function () { return obj.endI; }, curLineNo - 1);
+        this.a(function (e) {
+            if (!condFunc(e)) {
                 return obj.elseI;
             }
         });
-
-        this.ifStack.push({ type: "elif", obj: obj, chain: chain });
-
-        this.funcs[last] = seq(this.funcs[last], function () { return obj.endI; });
 
         return this;
     };
 
 
+    // elseと同じ行に他の命令はないと仮定している
     Code.prototype.aElse = function () {
         var aif = this.ifStack.pop();
 
         var obj = {};
-
         var chain = aif.chain.concat([obj]);
+        this.ifStack.push({ obj: obj, chain: chain });
 
-        var last = this.getCurIndex();
+        var curLineNo = this.getCurLineNo();
+        aif.obj.elseI = curLineNo;
 
-        aif.obj.elseI = last + 1;
-
-        this.funcs.push(NOP);
-
-        this.ifStack.push({ type: "else", obj: obj, chain: chain });
-
-        this.funcs[last] = seq(this.funcs[last], function () { return obj.endI; });
+        this.a(function () { return obj.endI; }, curLineNo - 1);
+        this.a(NOP);
 
         return this;
     };
 
 
-    Code.prototype.endIf = function (noSkip) {
-        if (!noSkip) {
-            this.funcs.push(SKIP);
-        }
-
+    Code.prototype.endIf = function () {
         var aif = this.ifStack.pop();
 
-        var last = this.getCurIndex();
+        this.a(SKIP);
 
-        aif.obj.elseI = last + 1;
+        var curPos = this.getCurPos();
+
+        aif.obj.elseI = curPos;
 
         aif.chain.forEach(function (obj) {
-            obj.endI = last + 1;
+            obj.endI = curPos;
         });
 
         return this;
