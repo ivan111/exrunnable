@@ -263,16 +263,23 @@
     }
 
 
-    function aCall(retAddr, args) {
+    function aCall(funcName, args) {
+        var retAddr = [this.curLine, this.curFuncIndex + 1];
+
         this.frames.push({
             retAddr: retAddr
         });
 
-        this.notifyCall(this);
+        this.notifyCall(this, funcName, this.curLine);
 
-        if (args) {
-            for (var key in args) {
-                this.vars(key, args[key]);
+        var params = this.code.defs[funcName].params;
+
+        if (params) {
+            for (var i = 0; i < params.length; i++) {
+                var param = params[i];
+                var arg = args[i];
+
+                this.vars(param, arg);
             }
         }
     }

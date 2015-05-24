@@ -20,15 +20,15 @@
 <script type="text/javascript">
 window.onload = function () {
   var code = new exr.Code()
-    .foreach("n", [0, 1, 2, 3]).nl()
-      .aIf(exr.cond("n", "==", 0)).nl()
-        .print("0").nl()
-      .elif(exr.cond("n", "==", 1)).nl()
-        .print("1").nl()
-      .elif(exr.cond("n", "==", 2)).nl()
-        .print("2").nl()
-      .aElse().nl()
-        .print("3").endIf().endForeach().nl()
+    .foreach("n", [0, 1, 2, 3]).br()
+      .aIf(exr.cond("n", "==", 0)).br()
+        .print("0").br()
+      .elif(exr.cond("n", "==", 1)).br()
+        .print("1").br()
+      .elif(exr.cond("n", "==", 2)).br()
+        .print("2").br()
+      .aElse().br()
+        .print("3").endIf().endForeach().br()
     .skip(1)
     .print("4");
 
@@ -42,9 +42,9 @@ window.onload = function () {
 
 
   code = new exr.Code()
-    .vars("i", 0).nl()
-    .aWhile(exr.cond("i", "!=", 3)).nl()
-      .printVar("i").nl()
+    .vars("i", 0).br()
+    .aWhile(exr.cond("i", "!=", 3)).br()
+      .printVar("i").br()
       .add("i", 1).endWhile();
 
   container = document.getElementById("container2");
@@ -57,7 +57,7 @@ window.onload = function () {
 
 
   code = new exr.Code()
-    .aFor(5).nl()
+    .aFor(5).br()
       .print("hello\n").endFor();
 
   container = document.getElementById("container3");
@@ -72,15 +72,15 @@ window.onload = function () {
 
 
   code = new exr.Code()
-    .foreach("n", [0, 1, 2, 3]).nl()
-      .aIf(exr.cond("n", "==", 0)).nl()
-        .print("0").nl()
-      .elif(exr.cond("n", "==", 1)).nl()
-        .breakForeach().nl()
-      .elif(exr.cond("n", "==", 2)).nl()
-        .print("2").nl()
-      .aElse().nl()
-        .print("3").endIf().endForeach().nl()
+    .foreach("n", [0, 1, 2, 3]).br()
+      .aIf(exr.cond("n", "==", 0)).br()
+        .print("0").br()
+      .elif(exr.cond("n", "==", 1)).br()
+        .breakForeach().br()
+      .elif(exr.cond("n", "==", 2)).br()
+        .print("2").br()
+      .aElse().br()
+        .print("3").endIf().endForeach().br()
     .skip(1)
     .print("4");
 
@@ -95,13 +95,14 @@ window.onload = function () {
 
 
   code = new exr.Code()
-    .aCall(3, function (e) { return { n: 4 }; }).print(function (e) { return e.ret; }).nl()
-    .jump(100).nl()
-    .skip(1)
-    .aIf(exr.cond("n", "==", 1)).nl()
-      .aReturn(1).nl()
-    .aElse().nl()
-      .aCall(3, function (e) { return { n: e.vars("n") - 1}; }).aReturn(function (e) { return e.ret * e.vars("n") }).endIf();
+    .aCall("fact", [4]).print(function (e) { return e.ret; }).br()
+    .br()
+    .def("fact", ["n"]).br()
+      .aIf(exr.cond("n", "==", 1)).br()
+        .aReturn(1).br()
+      .aElse().br()
+        .aCall("fact", function (e) { return [e.vars("n") - 1]; }).vars("v", function (e) { return e.ret * e.vars("n"); }).br()
+        .aReturnVar("v").endIf().endDef();
 
   container = document.getElementById("container5");
   codeTable = document.getElementById("code-table5");
@@ -191,13 +192,14 @@ window.onload = function () {
 
     <div id="container5">
       <table id="code-table5" class="highlighttable highlight">
-        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">print</span><span class="p">(</span><span class="n">fact</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">1</td><td class="code"><pre><span class="k">print</span><span class="p">(</span><span class="n">fact</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span></pre></td></tr>
         <tr><td class="linenos">2</td><td class="code"></td></tr>
         <tr><td class="linenos">3</td><td class="code"><pre><span class="k">def</span> <span class="nf">fact</span><span class="p">(</span><span class="n">n</span><span class="p">):</span></pre></td></tr>
         <tr><td class="linenos">4</td><td class="code"><pre>    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span></pre></td></tr>
         <tr><td class="linenos">5</td><td class="code"><pre>        <span class="k">return</span> <span class="mi">1</span></pre></td></tr>
         <tr><td class="linenos">6</td><td class="code"><pre>    <span class="k">else</span><span class="p">:</span></pre></td></tr>
-        <tr><td class="linenos">7</td><td class="code"><pre>        <span class="k">return</span> <span class="n">n</span> <span class="o">*</span> <span class="n">fact</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">7</td><td class="code"><pre>        <span class="n">v</span> <span class="o">=</span> <span class="n">n</span> <span class="o">*</span> <span class="n">fact</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></pre></td></tr>
+        <tr><td class="linenos">8</td><td class="code"><pre>        <span class="k">return</span> <span class="n">v</span></pre></td></tr>
       </table>
 
     </div>

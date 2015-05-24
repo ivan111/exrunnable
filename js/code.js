@@ -9,6 +9,9 @@
         // funcs[0]はコードの１行目で、関数の配列。
         this.funcs = [[]];
 
+        this.defs = {};
+
+        this.defStack = [];
         this.forStack = [];
         this.whileStack = [];
         this.foreachStack = [];
@@ -27,40 +30,13 @@
 
 
     function cond(varName, op, constVal) {
-        if (op === "==") {
-            return function (e) {
-                return e.vars(varName) === constVal;
-            };
-        }
-
-        if (op === "!=") {
-            return function (e) {
-                return e.vars(varName) !== constVal;
-            };
-        }
-
-        if (op === "<") {
-            return function (e) {
-                return e.vars(varName) < constVal;
-            };
-        }
-
-        if (op === "<=") {
-            return function (e) {
-                return e.vars(varName) <= constVal;
-            };
-        }
-
-        if (op === ">") {
-            return function (e) {
-                return e.vars(varName) > constVal;
-            };
-        }
-
-        if (op === ">=") {
-            return function (e) {
-                return e.vars(varName) >= constVal;
-            };
+        switch (op) {
+        case "==": return function (e) { return e.vars(varName) === constVal; };
+        case "!=": return function (e) { return e.vars(varName) !== constVal; };
+        case "<": return function (e) { return e.vars(varName) < constVal; };
+        case "<=": return function (e) { return e.vars(varName) <= constVal; };
+        case ">": return function (e) { return e.vars(varName) > constVal; };
+        case ">=": return function (e) { return e.vars(varName) >= constVal; };
         }
 
         throw "unknown op: " + op;
@@ -68,20 +44,24 @@
 
 
     Code.prototype.asert = function () {
+        if (this.defStack.length !== 0) {
+            throw "num(def) != num(endDef). defStack.length = " + this.defStack.length;
+        }
+
         if (this.forStack.length !== 0) {
-            throw "forStack.length = " + this.forStack.length;
+            throw "num(for) != num(endFor). forStack.length = " + this.forStack.length;
         }
 
         if (this.whileStack.length !== 0) {
-            throw "whileStack.length = " + this.whileStack.length;
+            throw "num(while) != num(endWhile). whileStack.length = " + this.whileStack.length;
         }
 
         if (this.foreachStack.length !== 0) {
-            throw "foreachStack.length = " + this.foreachStack.length;
+            throw "num(foreach) != num(endForeach). foreachStack.length = " + this.foreachStack.length;
         }
 
         if (this.ifStack.length !== 0) {
-            throw "ifStack.length = " + this.ifStack.length;
+            throw "num(if) != num(endIf). ifStack.length = " + this.ifStack.length;
         }
     };
 
@@ -131,9 +111,22 @@
     };
 
 
-    // newline
-    Code.prototype.nl = function () {
+    // 改行
+    Code.prototype.br = function () {
         this.funcs.push([]);
+
+        return this;
+    };
+
+
+    // 最後に追加した命令をスキップ命令にする
+    Code.prototype.isSkip = function () {
+        var pos = this.getCurPos();
+
+        var funcList = this.funcs[pos[0]];
+        var f = funcList[pos[1]];
+
+        f.isSkip = true;
 
         return this;
     };
@@ -141,7 +134,7 @@
 
     Code.prototype.skip = function (numLines) {
         for (var i = 0; i < numLines; i++) {
-            this.a(SKIP).nl();
+            this.br();
         }
 
         return this;
@@ -165,22 +158,8 @@
     };
 
 
-    Code.prototype.println = function (f) {
-        this.print(f, true);
-
-        return this;
-    };
-
-
     Code.prototype.printVar = function (varName, newline) {
         this.print(function (e) { return e.vars(varName); }, newline);
-
-        return this;
-    };
-
-
-    Code.prototype.printVarln = function (varName) {
-        this.printVar(varName, true);
 
         return this;
     };
@@ -242,8 +221,48 @@
     };
 
 
-    Code.prototype.aCall = function (lineNo, args) {
+    // (Ex) .def("func", ["a", "b"])
+    Code.prototype.def = function (funcName, params) {
+        if (funcName in this.defs) {
+            throw "conflict function name: " + funcName;
+        }
+
         var obj = {};
+
+        if (helpers.isNullOrUndef(params)) {
+            params = [];
+        }
+
+        // 関数定義を飛び越える
+        var f = function () { return obj.endI; };
+        f.isSkip = true;
+        this.a(f);
+
+        // 関数が呼ばれるとここに来る
+        this.a(SKIP);
+
+        this.defs[funcName] = { pos: this.getCurPos(), params: params };
+
+        this.defStack.push({ obj: obj });
+
+        return this;
+    };
+
+
+    Code.prototype.endDef = function () {
+        var def = this.defStack.pop();
+
+        this.a(SKIP);
+
+        def.obj.endI = this.getCurPos();
+
+        return this;
+    };
+
+
+    // (Ex) .aCall("func", [1, 2])
+    Code.prototype.aCall = function (funcName, args) {
+        var code = this;
 
         this.a(function (e) {
             var a = args;
@@ -252,35 +271,10 @@
                 a = args(e);
             }
 
-            e.aCall(obj.retAddr, a);
+            e.aCall(funcName, a);
 
-            return lineNo;
+            return code.defs[funcName].pos;
         });
-
-        this.a(SKIP);
-
-        obj.retAddr = this.getCurPos();
-
-        return this;
-    };
-
-
-    Code.prototype.implicitReturn = function (f) {
-        var func = function (e) {
-            var ret;
-
-            if (typeof f === "function") {
-                ret = f(e);
-            } else {
-                ret = f;
-            }
-
-            return e.aReturn(ret);
-        };
-
-        func.isSkip = true;
-
-        this.a(func);
 
         return this;
     };
@@ -295,6 +289,21 @@
             } else {
                 ret = f;
             }
+
+            return e.aReturn(ret);
+        });
+
+        return this;
+    };
+
+
+    Code.prototype.aReturnVar = function (varName) {
+        if (!isString(varName)) {
+            throw "aReturnVarの引数には変数名を指定してください";
+        }
+
+        this.a(function (e) {
+            var ret = e.vars(varName);
 
             return e.aReturn(ret);
         });
@@ -524,4 +533,13 @@
 
         return this;
     };
+
+
+    function isString(v) {
+        if (typeof v === "string" || v instanceof String) {
+            return true;
+        }
+
+        return false;
+    }
 })();
